@@ -392,6 +392,13 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
   }, [latestSignal]);
 
   useEffect(() => {
+    if (peerReady && !presenceSentRef.current) {
+      console.log("[WebRTC] Peer ready, sending presence");
+      sendPresence();
+    }
+  }, [peerReady]);
+
+  useEffect(() => {
     if (!latestSignal || latestSignal.sender_id === currentUser.id || !peerReady || !peerConnectionRef.current) {
       return;
     }

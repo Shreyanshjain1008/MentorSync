@@ -319,14 +319,6 @@ export function SessionRoomClient({ sessionId }: { sessionId: string }) {
     onMessage: useCallback((payload) => {
       setLatestSignal(payload);
     }, []),
-    onOpen: useCallback((socket: WebSocket) => {
-      socket.send(
-        JSON.stringify({
-          signal_type: "presence",
-          payload: { userId: user?.id },
-        }),
-      );
-    }, [user?.id]),
   });
 
   const remoteParticipantRole: UserRole | null = useMemo(() => {
