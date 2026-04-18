@@ -343,7 +343,7 @@ export function SessionRoomClient({ sessionId }: { sessionId: string }) {
     }
 
     return null;
-  }, [dashboardSession, latestCodeEvent]);
+  }, [dashboardSession, latestCodeEvent, user?.id]);
 
   const isCompletedSession = dashboardSession?.status === "completed";
   const canEndSession = Boolean(dashboardSession && user?.role === "mentor" && dashboardSession.mentor_id === user?.id);
