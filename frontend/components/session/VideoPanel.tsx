@@ -243,7 +243,36 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
         try {
           mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         } catch (mediaError) {
-          mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const isPermissionDenied =
+            mediaError instanceof DOMException &&
+            (mediaError.name === "NotAllowedError" || mediaError.name === "PermissionDeniedError");
+
+          if (isPermissionDenied) {
+            setError(
+              "Camera and/or microphone access denied. Please allow camera and microphone permissions in browser settings and refresh the page."
+            );
+            return;
+          }
+
+          // Fallback to video only if audio fails
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          } catch (videoError) {
+            const isVideoPermissionDenied =
+              videoError instanceof DOMException &&
+              (videoError.name === "NotAllowedError" || videoError.name === "PermissionDeniedError");
+
+            if (isVideoPermissionDenied) {
+              setError(
+                "Camera access denied. Please allow camera permission in browser settings and refresh the page."
+              );
+            } else {
+              setError(
+                videoError instanceof Error ? videoError.message : "Unable to access camera device"
+              );
+            }
+            return;
+          }
         }
 
         if (!isMounted) {
@@ -257,6 +286,11 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
         localCameraTrackRef.current = videoTrack ?? null;
         localCameraStreamIdRef.current = videoTrack ? mediaStream.id : null;
         syncLocalCameraPreview(videoTrack ?? null);
+
+        if (!videoTrack && !audioTrack) {
+          setError("No media tracks available. Please check your camera and microphone.");
+          return;
+        }
 
         const connection = new RTCPeerConnection({
           iceServers: env.iceServers,
@@ -272,6 +306,7 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
         }
 
         connection.ontrack = (event) => {
+          console.log(`[WebRTC] Received remote track: ${event.track.kind}`);
           if (event.track.kind === "audio") {
             syncRemoteAudioTrack(event.track);
             return;
@@ -295,15 +330,31 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
         };
 
         connection.onconnectionstatechange = () => {
+          console.log(`[WebRTC] Connection state: ${connection.connectionState}`);
           if (connection.connectionState === "failed") {
-            setError("Peer connection failed. Configure TURN servers for production and rejoin the room.");
+            setError(
+              "Peer connection failed. Please ensure both participants have a stable internet connection. If you're behind a corporate firewall, contact your administrator."
+            );
+          }
+          if (connection.connectionState === "connected") {
+            setError(null);
           }
         };
 
         connection.oniceconnectionstatechange = () => {
+          console.log(`[WebRTC] ICE connection state: ${connection.iceConnectionState}`);
           if (connection.iceConnectionState === "failed") {
-            setError("ICE connection failed. Your deployed app likely needs TURN servers, not just STUN.");
+            setError(
+              "Unable to establish peer connection. This usually means: 1) firewall/NAT blocking, 2) no internet, or 3) incompatible networks. Try: refreshing the page, checking your internet, or ensuring both participants are online."
+            );
           }
+          if (connection.iceConnectionState === "connected") {
+            setError(null);
+          }
+        };
+
+        connection.onicegatheringstatechange = () => {
+          console.log(`[WebRTC] ICE gathering state: ${connection.iceGatheringState}`);
         };
 
         sendPresence();
