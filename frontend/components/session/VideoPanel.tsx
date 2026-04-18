@@ -4,6 +4,7 @@ import type { MutableRefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import type { AuthUser } from "@/types/auth";
+import { env } from "@/lib/env";
 import type { SignalingEvent } from "@/types/session";
 
 interface VideoPanelProps {
@@ -258,7 +259,7 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
         syncLocalCameraPreview(videoTrack ?? null);
 
         const connection = new RTCPeerConnection({
-          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+          iceServers: env.iceServers,
         });
         peerConnectionRef.current = connection;
         setPeerReady(true);
@@ -295,7 +296,13 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
 
         connection.onconnectionstatechange = () => {
           if (connection.connectionState === "failed") {
-            setError("Peer connection failed. Refresh the room and join again.");
+            setError("Peer connection failed. Configure TURN servers for production and rejoin the room.");
+          }
+        };
+
+        connection.oniceconnectionstatechange = () => {
+          if (connection.iceConnectionState === "failed") {
+            setError("ICE connection failed. Your deployed app likely needs TURN servers, not just STUN.");
           }
         };
 
