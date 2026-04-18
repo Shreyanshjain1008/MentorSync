@@ -1,7 +1,7 @@
 "use client";
 
 import type { MutableRefObject } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { AuthUser } from "@/types/auth";
 import { env } from "@/lib/env";
@@ -63,91 +63,100 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
     );
   };
 
-  const syncVideoElement = (element: HTMLVideoElement | null, stream: MediaStream | null) => {
+  const syncVideoElement = useCallback((element: HTMLVideoElement | null, stream: MediaStream | null) => {
     if (element) {
       element.srcObject = stream;
     }
-  };
+  }, []);
 
-  const syncAudioElement = (element: HTMLAudioElement | null, stream: MediaStream | null) => {
+  const syncAudioElement = useCallback((element: HTMLAudioElement | null, stream: MediaStream | null) => {
     if (element) {
       element.srcObject = stream;
     }
-  };
+  }, []);
 
-  const syncLocalCameraPreview = (track: MediaStreamTrack | null) => {
-    localCameraPreviewStreamRef.current?.getTracks().forEach((candidate) => candidate.stop());
+  const syncLocalCameraPreview = useCallback(
+    (track: MediaStreamTrack | null) => {
+      localCameraPreviewStreamRef.current?.getTracks().forEach((candidate) => candidate.stop());
 
-    if (!track) {
-      localCameraPreviewStreamRef.current = null;
-      syncVideoElement(localCameraRef.current, null);
-      return;
-    }
+      if (!track) {
+        localCameraPreviewStreamRef.current = null;
+        syncVideoElement(localCameraRef.current, null);
+        return;
+      }
 
-    const previewStream = new MediaStream([track]);
-    localCameraPreviewStreamRef.current = previewStream;
-    syncVideoElement(localCameraRef.current, previewStream);
-  };
+      const previewStream = new MediaStream([track]);
+      localCameraPreviewStreamRef.current = previewStream;
+      syncVideoElement(localCameraRef.current, previewStream);
+    },
+    [syncVideoElement],
+  );
 
-  const clearRemoteScreen = () => {
+  const clearRemoteScreen = useCallback(() => {
     remoteScreenStreamRef.current?.getTracks().forEach((track) => track.stop());
     remoteScreenStreamRef.current = null;
     syncVideoElement(remoteScreenRef.current, null);
     setHasRemoteScreen(false);
-  };
+  }, [syncVideoElement]);
 
-  const clearRemoteCamera = () => {
+  const clearRemoteCamera = useCallback(() => {
     remoteCameraStreamRef.current?.getTracks().forEach((track) => track.stop());
     remoteCameraStreamRef.current = null;
     syncVideoElement(remoteCameraRef.current, null);
     setHasRemoteCamera(false);
-  };
+  }, [syncVideoElement]);
 
-  const clearRemoteAudio = () => {
+  const clearRemoteAudio = useCallback(() => {
     remoteAudioStreamRef.current?.getTracks().forEach((track) => track.stop());
     remoteAudioStreamRef.current = null;
     syncAudioElement(remoteAudioRef.current, null);
-  };
+  }, [syncAudioElement]);
 
-  const syncRemoteVideoTrack = (
-    target: "camera" | "screen",
-    track: MediaStreamTrack,
-    onEnded: () => void,
-  ) => {
-    const stream = new MediaStream([track]);
+  const syncRemoteVideoTrack = useCallback(
+    (
+      target: "camera" | "screen",
+      track: MediaStreamTrack,
+      onEnded: () => void,
+    ) => {
+      const stream = new MediaStream([track]);
 
-    if (target === "camera") {
-      remoteCameraStreamRef.current?.getTracks().forEach((candidate) => candidate.stop());
-      remoteCameraStreamRef.current = stream;
-      syncVideoElement(remoteCameraRef.current, stream);
-      setHasRemoteCamera(true);
-    } else {
-      remoteScreenStreamRef.current?.getTracks().forEach((candidate) => candidate.stop());
-      remoteScreenStreamRef.current = stream;
-      syncVideoElement(remoteScreenRef.current, stream);
-      setHasRemoteScreen(true);
-    }
+      if (target === "camera") {
+        remoteCameraStreamRef.current?.getTracks().forEach((candidate) => candidate.stop());
+        remoteCameraStreamRef.current = stream;
+        syncVideoElement(remoteCameraRef.current, stream);
+        setHasRemoteCamera(true);
+      } else {
+        remoteScreenStreamRef.current?.getTracks().forEach((candidate) => candidate.stop());
+        remoteScreenStreamRef.current = stream;
+        syncVideoElement(remoteScreenRef.current, stream);
+        setHasRemoteScreen(true);
+      }
 
-    track.onended = onEnded;
-  };
+      track.onended = onEnded;
+    },
+    [syncVideoElement],
+  );
 
-  const syncRemoteAudioTrack = (track: MediaStreamTrack) => {
-    remoteAudioStreamRef.current?.getTracks().forEach((candidate) => candidate.stop());
+  const syncRemoteAudioTrack = useCallback(
+    (track: MediaStreamTrack) => {
+      remoteAudioStreamRef.current?.getTracks().forEach((candidate) => candidate.stop());
 
-    const stream = new MediaStream([track]);
-    remoteAudioStreamRef.current = stream;
-    syncAudioElement(remoteAudioRef.current, stream);
-    track.onended = () => {
-      clearRemoteAudio();
-    };
-  };
+      const stream = new MediaStream([track]);
+      remoteAudioStreamRef.current = stream;
+      syncAudioElement(remoteAudioRef.current, stream);
+      track.onended = () => {
+        clearRemoteAudio();
+      };
+    },
+    [syncAudioElement, clearRemoteAudio],
+  );
 
-  const broadcastMediaState = () => {
+  const broadcastMediaState = useCallback(() => {
     sendSignal("media-state", {
       cameraStreamId: localCameraStreamIdRef.current,
       screenStreamId: localScreenStreamIdRef.current,
     });
-  };
+  }, [sendSignal]);
 
   const resolveIncomingVideoTarget = (event: RTCTrackEvent): "camera" | "screen" => {
     const remoteStream = event.streams[0];
@@ -174,7 +183,7 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
     return "camera";
   };
 
-  const sendPresence = () => {
+  const sendPresence = useCallback(() => {
     if (!peerConnectionRef.current || presenceSentRef.current) {
       return;
     }
@@ -186,7 +195,7 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
     presenceSentRef.current = true;
     sendSignal("presence", { userId: currentUser.id });
     broadcastMediaState();
-  };
+  }, [currentUser.id, broadcastMediaState, sendSignal]);
 
   const renegotiateIfNeeded = async () => {
     const connection = peerConnectionRef.current;
@@ -327,11 +336,11 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
       remoteScreenStreamRef.current?.getTracks().forEach((track) => track.stop());
       remoteAudioStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
-  }, [currentUser.id]);
+  }, [currentUser.id, sendSignal, sendPresence, stopScreenShare, syncLocalCameraPreview, syncRemoteAudioTrack, syncRemoteVideoTrack, clearRemoteCamera, clearRemoteScreen]);
 
   useEffect(() => {
     sendPresence();
-  }, [latestSignal]);
+  }, [latestSignal, sendPresence]);
 
   useEffect(() => {
     if (!latestSignal || latestSignal.sender_id === currentUser.id || !peerReady || !peerConnectionRef.current) {
@@ -453,7 +462,7 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
     };
 
     void handleSignal();
-  }, [currentUser.id, latestSignal, peerReady]);
+  }, [currentUser.id, latestSignal, peerReady, sendSignal, broadcastMediaState, clearRemoteCamera, clearRemoteScreen]);
 
   const toggleMute = () => {
     const nextMuted = !isMuted;
