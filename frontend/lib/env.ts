@@ -22,9 +22,29 @@ function toWebSocketUrl(url: string) {
   throw new Error("Unable to derive websocket URL from NEXT_PUBLIC_API_URL");
 }
 
+function isLocalhostUrl(url: string) {
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.hostname === "127.0.0.1" || parsedUrl.hostname === "localhost";
+  } catch {
+    return false;
+  }
+}
+
+const wsBaseUrl = (() => {
+  if (explicitWsBaseUrl) {
+    if (process.env.NODE_ENV === "production" && isLocalhostUrl(explicitWsBaseUrl)) {
+      return toWebSocketUrl(apiBaseUrl);
+    }
+    return toWebSocketUrl(explicitWsBaseUrl);
+  }
+
+  return toWebSocketUrl(apiBaseUrl);
+})();
+
 export const env = {
   apiBaseUrl,
-  wsBaseUrl: explicitWsBaseUrl ? toWebSocketUrl(explicitWsBaseUrl) : toWebSocketUrl(apiBaseUrl),
+  wsBaseUrl,
   iceServers: (() => {
     if (!rawIceServers) {
       return [{ urls: "stun:stun.l.google.com:19302" }] as RTCIceServer[];
