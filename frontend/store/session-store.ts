@@ -21,7 +21,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   sessions: [],
   messages: {},
   hasLoadedSessions: false,
-  activeLanguage: "javascript",
+  activeLanguage: "python",
   setSessions: (sessions) => set({ sessions, hasLoadedSessions: true }),
   upsertSession: (session) =>
     set((state) => ({
