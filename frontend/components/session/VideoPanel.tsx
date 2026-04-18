@@ -176,13 +176,18 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
 
   const sendPresence = () => {
     if (!peerConnectionRef.current || presenceSentRef.current) {
+      if (presenceSentRef.current) {
+        console.log("[WebRTC] Presence already sent, skipping");
+      }
       return;
     }
 
     if (signalingSocket.current?.readyState !== WebSocket.OPEN) {
+      console.log("[WebRTC] Signaling socket not open, cannot send presence");
       return;
     }
 
+    console.log("[WebRTC] Sending presence signal");
     presenceSentRef.current = true;
     sendSignal("presence", { userId: currentUser.id });
     broadcastMediaState();
@@ -323,9 +328,11 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
 
         connection.onicecandidate = ({ candidate }) => {
           if (!candidate) {
+            console.log("[WebRTC] ICE gathering complete");
             return;
           }
 
+          console.log("[WebRTC] Sending ICE candidate", candidate.candidate);
           sendSignal("ice-candidate", candidate.toJSON() as Record<string, unknown>);
         };
 
@@ -401,7 +408,13 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
       try {
         makingOfferRef.current = true;
         const offer = await connection.createOffer();
+        console.log("[WebRTC] Created offer, local tracks:", {
+          audio: !!localAudioTrackRef.current,
+          video: !!localCameraTrackRef.current,
+          signalingState: connection.signalingState,
+        });
         await connection.setLocalDescription(offer);
+        console.log("[WebRTC] Sent offer to remote peer");
         sendSignal("offer", offer as unknown as Record<string, unknown>);
       } finally {
         makingOfferRef.current = false;
@@ -412,12 +425,14 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
       try {
         switch (latestSignal.signal_type) {
           case "presence": {
+            console.log("[WebRTC] Received presence from remote peer");
             broadcastMediaState();
             await new Promise((resolve) => setTimeout(resolve, 100));
             await sendOffer();
             break;
           }
           case "media-state": {
+            console.log("[WebRTC] Received media state:", latestSignal.payload);
             remoteMediaIdsRef.current = {
               cameraStreamId: typeof latestSignal.payload.cameraStreamId === "string" ? latestSignal.payload.cameraStreamId : null,
               screenStreamId: typeof latestSignal.payload.screenStreamId === "string" ? latestSignal.payload.screenStreamId : null,
@@ -440,6 +455,7 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
             break;
           }
           case "offer": {
+            console.log("[WebRTC] Received offer from peer");
             const description = latestSignal.payload as unknown as RTCSessionDescriptionInit;
             const readyForOffer =
               !makingOfferRef.current &&
@@ -447,10 +463,12 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
             const offerCollision = !readyForOffer;
             ignoreOfferRef.current = !polite && offerCollision;
             if (ignoreOfferRef.current) {
+              console.log("[WebRTC] Ignoring offer due to collision (impolite peer)");
               return;
             }
 
             if (offerCollision) {
+              console.log("[WebRTC] Offer collision detected, rolling back");
               await Promise.all([
                 connection.setLocalDescription({ type: "rollback" }),
                 connection.setRemoteDescription(new RTCSessionDescription(description)),
@@ -460,6 +478,7 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
             }
 
             const answer = await connection.createAnswer();
+            console.log("[WebRTC] Created answer, sending to remote peer");
             await connection.setLocalDescription(answer);
             sendSignal("answer", answer as unknown as Record<string, unknown>);
 
@@ -472,7 +491,9 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
             break;
           }
           case "answer": {
+            console.log("[WebRTC] Received answer from peer");
             if (connection.signalingState !== "have-local-offer") {
+              console.log("[WebRTC] Ignoring answer - not in have-local-offer state");
               return;
             }
 
@@ -481,16 +502,20 @@ export function VideoPanel({ currentUser, signalingSocket, latestSignal }: Video
               await connection.setRemoteDescription(
                 new RTCSessionDescription(latestSignal.payload as unknown as RTCSessionDescriptionInit),
               );
+              console.log("[WebRTC] Answer set successfully");
             } finally {
               isSettingRemoteAnswerPendingRef.current = false;
             }
             break;
           }
           case "ice-candidate": {
+            console.log("[WebRTC] Received ICE candidate");
             const candidate = latestSignal.payload as RTCIceCandidateInit;
             if (connection.remoteDescription) {
               await connection.addIceCandidate(new RTCIceCandidate(candidate));
+              console.log("[WebRTC] ICE candidate added");
             } else {
+              console.log("[WebRTC] No remote description yet, queuing ICE candidate");
               pendingCandidatesRef.current.push(candidate);
             }
             break;
