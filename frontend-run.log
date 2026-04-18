@@ -1,0 +1,15 @@
+
+> mentorsync-frontend@1.0.0 dev
+> next dev
+
+   ▲ Next.js 15.5.14
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.1.4:3001
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 4.9s
+ ○ Compiling / ...
+ ✓ Compiled / in 10.3s (559 modules)
+ GET / 200 in 124ms
+ ✓ Compiled in 26.8s (236 modules)
