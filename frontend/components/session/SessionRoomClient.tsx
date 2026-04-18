@@ -28,7 +28,7 @@ export function SessionRoomClient({ sessionId }: { sessionId: string }) {
     [sessionId, sessions],
   );
   const [session, setSession] = useState<SessionRecord | null>(cachedSession);
-  const [code, setCode] = useState("// Start collaborating live...\n");
+  const [code, setCode] = useState("# Start collaborating live...\n");
   const [latestCodeEvent, setLatestCodeEvent] = useState<CodeSyncEvent | null>(null);
   const [latestSignal, setLatestSignal] = useState<SignalingEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export function SessionRoomClient({ sessionId }: { sessionId: string }) {
   );
   const pendingCodeSyncRef = useRef<{ code: string; cursorPosition: number | null } | null>(null);
   const lastSentCodeSyncRef = useRef<{ code: string; cursorPosition: number | null }>({
-    code: "// Start collaborating live...\n",
+    code: "# Start collaborating live...\n",
     cursorPosition: null,
   });
   const lastCodeSnapshotAtRef = useRef<string | null>(null);
